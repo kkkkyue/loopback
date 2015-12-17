@@ -29,41 +29,31 @@ module.exports = function(Checkpoint) {
    * @param {Error} err
    * @param {Number} checkpointId The current checkpoint id
    */
-
   Checkpoint.current = function(cb) {
     var Checkpoint = this;
-    this.find({
-      limit: 1,
-      order: 'seq DESC'
-    }, function(err, checkpoints) {
+    this.findOne(function(err, cp) {
       if (err) return cb(err);
-      var checkpoint = checkpoints[0];
-      if (checkpoint) {
-        cb(null, checkpoint.seq);
+      if (cp) {
+        cb(null, cp.seq);
       } else {
-        Checkpoint.create({ seq: 1 }, function(err, checkpoint) {
+        Checkpoint.create({ seq: 1 }, function(err, data) {
           if (err) return cb(err);
-          cb(null, checkpoint.seq);
+          cb(null, data.seq);
         });
       }
     });
   };
 
-  Checkpoint.observe('before save', function(ctx, next) {
-    if (!ctx.instance) {
-      // Example: Checkpoint.updateAll() and Checkpoint.updateOrCreate()
-      return next(new Error('Checkpoint does not support partial updates.'));
-    }
-
-    var model = ctx.instance;
-    if (!model.getId() && model.seq === undefined) {
-      model.constructor.current(function(err, seq) {
-        if (err) return next(err);
-        model.seq = seq + 1;
-        next();
-      });
-    } else {
-      next();
-    }
-  });
+  Checkpoint.bump = function(cb){
+    this.findOne(function(err, cp){
+      if(err)
+        return cb(err, null);
+      if (cp){
+        cp.seq++;
+      } else {
+        cp = new Checkpoint({seq: 1});     
+      }
+      cp.save(cb);
+    })
+  }
 };
